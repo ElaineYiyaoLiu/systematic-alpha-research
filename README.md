@@ -3,32 +3,15 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB)](https://www.python.org/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-D7FF64)](https://docs.astral.sh/ruff/)
 
-A leakage-aware cross-sectional equity research pipeline for testing price-volume
-signals under executable timing, chronological model selection, portfolio turnover,
-and transaction costs.
+A leakage-aware cross-sectional equity research pipeline for testing whether
+price-volume signals remain useful after executable timing, chronological model
+selection, portfolio turnover, transaction costs, and out-of-sample evaluation.
 
-The project asks a simple question: does a statistically detectable signal remain
-economically useful once it is converted into a portfolio under realistic research
-constraints? In the included case study, it does not. That negative result is the
-central finding, not a result to be hidden or optimized away.
-
-## Key finding
-
-The case study finds small but statistically detectable rank predictability, but
-portfolio performance does not remain stable out of sample. At 5 basis points per
-dollar traded:
-
-| Strategy | Sample | Rebalance | Turnover | Gross Sharpe | Net Sharpe | Net annualized return |
-|---|---|---:|---:|---:|---:|---:|
-| Reversal | Validation | 10D | 0.154 | 1.61 | 1.38 | 12.15% |
-| Reversal | Historical evaluation | 10D | 0.155 | 0.27 | 0.04 | Approximately 0.00% |
-| Static composite | Validation | 10D | 0.145 | 0.99 | 0.57 | 2.40% |
-| Static composite | Historical evaluation | 10D | 0.147 | 0.30 | -0.10 | -0.57% |
-
-
-The deterioration is evidence against treating either specification as validated
-alpha. A positive information coefficient or an attractive validation Sharpe is not
-enough to support an investment claim.
+The current experiment compares four individual signals, several equal-weight
+combinations, a training-only optimized composite, and a trailing-only rolling
+composite. The repository provides the research pipeline rather than a fixed set of
+archived performance claims. Each fresh run records the data and specification
+fingerprints associated with its results.
 
 ## What the project demonstrates
 
@@ -42,7 +25,7 @@ enough to support an investment claim.
 - Complete turnover accounting and linear transaction-cost sensitivity
 - Newey-West IC inference and paired moving-block bootstrap inference
 - Locked dependencies, continuous integration, and assumption-focused tests
-- Explicit documentation of negative results and remaining limitations
+- Explicit documentation of remaining limitations
 
 ## Research design
 
@@ -101,10 +84,8 @@ then applied to every candidate. All models use an identical four-alpha-valid
 security-date sample so availability differences cannot create an artificial
 advantage.
 
-The committed empirical snapshot reports the baseline case study. Its vendor input
-cannot be redistributed, so those numbers are preserved as an audit artifact rather
-than presented as exactly reproducible from a fresh public download. Fresh runs
-write to `results/reproduced/` and record their data and specification fingerprints.
+Static optimized weights use training-period information coefficients only. Rolling
+weights may use an IC observation only after its forward-return label has completed.
 
 ## Portfolio simulation
 
@@ -118,9 +99,13 @@ cost_t = turnover_t * cost_bps / 10,000
 net_return_t = gross_return_t - cost_t
 ```
 
-Turnover includes initial entry, scheduled rebalancing, and forced exits after loss
-of eligibility. An active position with a missing forward return raises an error
-instead of receiving a favorable zero return.
+Turnover includes initial entry, scheduled rebalancing, natural weight drift, and
+forced exits after loss of eligibility. An active position with a missing forward
+return raises an error instead of receiving an assumed zero return.
+
+Zero reported volume is treated as unavailable rather than as a valid price-volume
+observation. Non-positive adjusted prices and negative reported volume remain data
+validation failures.
 
 Portfolio selection uses only point-in-time membership and signal availability.
 Forward-return completeness is tracked separately for IC estimation and inference,
@@ -133,9 +118,10 @@ moving-block bootstrap. Candidate and baseline return series share the same resa
 blocks, preserving paired market-period variation when estimating excess-return and
 Sharpe-difference intervals.
 
-The result should still be interpreted conservatively. Chronological separation
-reduces researcher degrees of freedom, but it does not eliminate multiple testing or
-selection uncertainty created by repeated experimentation.
+The results should still be interpreted conservatively. Chronological separation
+reduces researcher degrees of freedom, but it does not eliminate multiple testing,
+selection uncertainty, or data-quality limitations. A positive IC or validation
+Sharpe is not sufficient evidence of durable economic value.
 
 ## Reproduce the pipeline
 
@@ -172,12 +158,16 @@ This fallback uses current S&P 500 constituents and therefore has survivorship b
 It can exercise the full pipeline, but it cannot support an unbiased historical
 investment claim.
 
+Fresh runs write their reports, tables, figures, and metadata to
+`results/reproduced/`. Generated artifacts are kept local by default so results
+from different data snapshots are not presented as interchangeable evidence.
+
 ## Tests
 
 The test suite focuses on assumptions that can silently invalidate a backtest:
 
 - next-open-to-open return alignment and sample-boundary purging;
-- duplicate and missing quote handling;
+- duplicate, missing, and non-positive observation handling;
 - future-data and price-scale invariance;
 - eligibility-aware transforms and common-sample construction;
 - training-only and label-availability-aware weights;

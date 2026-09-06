@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -95,6 +96,11 @@ def main(argv: list[str] | None = None) -> int:
         ).to_csv(index=False)
         membership_sha256 = hashlib.sha256(canonical_membership.encode()).hexdigest()
         data = mark_point_in_time_eligibility(data, membership)
+        config = replace(
+            config,
+            universe_mode="point_in_time",
+            membership_path=str(membership_path),
+        )
     elif config.universe_mode == "point_in_time":
         raise ValueError(
             "point_in_time universe_mode requires --membership or data.membership_path"

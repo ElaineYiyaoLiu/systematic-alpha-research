@@ -69,14 +69,18 @@ giving zero net and 1.0 gross exposure.
 With point-in-time membership, only eligible securities enter cross-sectional
 ranks, winsorization, standardization, IC estimation and minimum-universe counts.
 Prices outside membership remain available solely to value and close a pre-existing
-position.
+position. A missing membership state is never interpreted as an exit. An explicit
+loss of eligibility may trigger a forced exit, while a missing security-date state
+for an active holding raises an error.
 
 ## Costs and validation
 
 Between target dates, asset weights drift with realized returns. Turnover is measured
 from those drifted holdings to the next target, so weights are not maintained for
 free. Initial entry is charged. Net return equals gross return minus turnover
-multiplied by the configured cost in basis points. The equal-weight baseline selects
+multiplied by the configured cost in basis points. Transaction costs also reduce the
+wealth denominator used to calculate end-of-period portfolio weights. The
+equal-weight baseline selects
 once among 1, 5, 10 and 21-day rebalancing at 5 bps. That single frequency is applied
 to every model and frozen for the historical holdout. Circular moving-block bootstrap
 intervals quantify performance uncertainty and paired improvement over the baseline.

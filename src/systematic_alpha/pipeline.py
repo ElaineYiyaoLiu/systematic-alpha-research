@@ -18,7 +18,6 @@ from .combination import (
     fit_static_weights,
 )
 from .config import ResearchConfig
-from .costs import apply_linear_costs
 from .data import validate_processed_data
 from .inference import bootstrap_paired_difference, bootstrap_performance_interval
 from .metrics import performance_statistics
@@ -82,6 +81,7 @@ def _evaluate(
     signal: str,
     frequency: int,
     config: ResearchConfig,
+    cost_bps: float | None = None,
 ) -> tuple[pd.DataFrame, dict[str, float]]:
     usable = data.loc[
         data.groupby("Date")["forward_return_1d"].transform("count").gt(0)
@@ -96,15 +96,20 @@ def _evaluate(
         minimum_cross_section_size=config.minimum_cross_section_size,
         selection_eligibility_col="selection_eligible",
     )
-    simulation = simulate_portfolio(weights, usable)
-    result = apply_linear_costs(
-        simulation["gross_return"],
-        simulation["turnover"],
-        config.transaction_cost_bps,
+    effective_cost_bps = (
+        config.transaction_cost_bps if cost_bps is None else cost_bps
     )
-    result[["gross_exposure_end", "net_exposure_end"]] = simulation[
-        ["gross_exposure_end", "net_exposure_end"]
-    ]
+    simulation = simulate_portfolio(weights, usable, cost_bps=effective_cost_bps)
+    result = simulation[
+        [
+            "gross_return",
+            "turnover",
+            "transaction_cost",
+            "net_return",
+            "gross_exposure_end",
+            "net_exposure_end",
+        ]
+    ].copy()
     metrics = performance_statistics(result["net_return"], config.annualization_factor)
     average_turnover = float(result["turnover"].mean())
     metrics["average_daily_turnover"] = average_turnover
@@ -320,8 +325,10 @@ def run_pipeline(
         tables,
     )
     _write_cost_sensitivity(
-        validation_returns_by_signal,
-        test_returns_by_signal,
+        validation_evaluation,
+        test_evaluation,
+        evaluation_signals,
+        selected_frequency,
         config,
         tables / "cost_sensitivity.csv",
     )
@@ -436,29 +443,33 @@ def _write_bootstrap_inference(
 
 
 def _write_cost_sensitivity(
-    validation_returns: dict[str, pd.DataFrame],
-    test_returns: dict[str, pd.DataFrame],
+    validation_data: pd.DataFrame,
+    test_data: pd.DataFrame,
+    signals: tuple[str, ...],
+    frequency: int,
     config: ResearchConfig,
     path: Path,
 ) -> None:
     rows: list[dict[str, object]] = []
-    for sample_name, frames in (
-        ("validation", validation_returns),
-        ("historical_holdout", test_returns),
+    for sample_name, sample in (
+        ("validation", validation_data),
+        ("historical_holdout", test_data),
     ):
-        for signal, frame in frames.items():
+        for signal in signals:
             for cost_bps in config.cost_scenarios_bps:
-                net = apply_linear_costs(
-                    frame["gross_return"], frame["turnover"], cost_bps
+                _, metrics = _evaluate(
+                    sample,
+                    signal,
+                    frequency,
+                    config,
+                    cost_bps=cost_bps,
                 )
                 rows.append(
                     {
                         "sample": sample_name,
                         "signal": signal,
                         "cost_bps": cost_bps,
-                        **performance_statistics(
-                            net["net_return"], config.annualization_factor
-                        ),
+                        **metrics,
                     }
                 )
     pd.DataFrame(rows).to_csv(path, index=False)

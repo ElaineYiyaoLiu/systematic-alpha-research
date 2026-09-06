@@ -152,6 +152,72 @@ def test_ineligible_holding_is_forced_out_and_charged_turnover():
     assert result.loc[dates[1], "turnover"] == pytest.approx(0.5)
 
 
+def test_missing_eligibility_row_cannot_silently_force_exit():
+    dates = pd.to_datetime(["2024-01-01", "2024-01-02"])
+    targets = pd.DataFrame(
+        {
+            "Date": [dates[0], dates[0], dates[1], dates[1]],
+            "Ticker": ["A", "B", "A", "B"],
+            "weight": [0.5, -0.5, 0.5, -0.5],
+            "is_rebalance": [True, True, False, False],
+        }
+    )
+    returns = pd.DataFrame(
+        {
+            "Date": [dates[0], dates[0], dates[1]],
+            "Ticker": ["A", "B", "B"],
+            "forward_return_1d": [0.0, 0.0, 0.0],
+            "eligible": [True, True, True],
+        }
+    )
+    with pytest.raises(ValueError, match="Missing eligibility for active positions"):
+        simulate_portfolio(targets, returns)
+
+
+def test_transaction_cost_reduces_wealth_used_for_weight_drift():
+    date = pd.Timestamp("2024-01-01")
+    targets = pd.DataFrame(
+        {
+            "Date": [date, date],
+            "Ticker": ["A", "B"],
+            "weight": [0.5, -0.5],
+            "is_rebalance": [True, True],
+        }
+    )
+    returns = pd.DataFrame(
+        {
+            "Date": [date, date],
+            "Ticker": ["A", "B"],
+            "forward_return_1d": [0.0, 0.0],
+        }
+    )
+    result = simulate_portfolio(targets, returns, cost_bps=10)
+    assert result.loc[date, "transaction_cost"] == pytest.approx(0.001)
+    assert result.loc[date, "net_return"] == pytest.approx(-0.001)
+    assert result.loc[date, "gross_exposure_end"] == pytest.approx(1 / 0.999)
+
+
+def test_tied_signals_do_not_depend_on_ticker_order():
+    date = pd.Timestamp("2024-01-01")
+    data = pd.DataFrame(
+        {
+            "Date": date,
+            "Ticker": list("ABCDEFGH"),
+            "signal": [0, 0, 1, 1, 2, 2, 3, 3],
+        }
+    )
+    first = build_weights(data, "signal", rebalance_frequency=1, quantiles=4)
+    second = build_weights(
+        data.sample(frac=1, random_state=7),
+        "signal",
+        rebalance_frequency=1,
+        quantiles=4,
+    )
+    first_weights = first.set_index("Ticker")["weight"].sort_index()
+    second_weights = second.set_index("Ticker")["weight"].sort_index()
+    pd.testing.assert_series_equal(first_weights, second_weights)
+
+
 def test_build_weights_never_selects_ineligible_security():
     data = pd.DataFrame(
         {

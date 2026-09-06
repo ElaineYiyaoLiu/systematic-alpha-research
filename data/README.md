@@ -17,4 +17,6 @@ For point-in-time evaluation, provide a membership CSV with `Ticker`, `StartDate
 and `EndDate` columns, set `data.universe_mode` to `point_in_time`, and set
 `data.membership_path` or pass `--membership`. Dates are inclusive and a missing
 `EndDate` means membership remains active. Delisting returns must still be supplied
-in the market data; the pipeline never invents a zero return for a missing holding.
+in the market data. The file must contain every historical constituent needed by the
+study, not only the current index members. The pipeline never invents a zero return
+or an implicit universe exit for a missing holding.

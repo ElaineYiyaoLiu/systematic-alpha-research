@@ -48,7 +48,9 @@ def build_weights(
         ].dropna(subset=[signal_col])
         rebalanced = False
         if date in rebalance_dates and len(daily) >= minimum_size:
-            ranks = daily[signal_col].rank(method="first", pct=True)
+            # Average ranks keep membership independent of input or ticker
+            # ordering when a signal contains ties.
+            ranks = daily[signal_col].rank(method="average", pct=True)
             long_names = daily.loc[ranks > 1 - 1 / quantiles, "Ticker"]
             short_names = daily.loc[ranks <= 1 / quantiles, "Ticker"]
             if len(long_names) and len(short_names):
@@ -77,6 +79,7 @@ def simulate_portfolio(
     target_weights: pd.DataFrame,
     returns: pd.DataFrame,
     return_col: str = "forward_return_1d",
+    cost_bps: float = 0.0,
 ) -> pd.DataFrame:
     """Simulate returns, natural weight drift and trades back to targets.
 
@@ -88,6 +91,8 @@ def simulate_portfolio(
     missing = required.difference(target_weights.columns)
     if missing:
         raise ValueError(f"Missing target-weight columns: {sorted(missing)}")
+    if cost_bps < 0:
+        raise ValueError("cost_bps must be non-negative")
 
     weight_matrix = target_weights.pivot(
         index="Date", columns="Ticker", values="weight"
@@ -101,7 +106,9 @@ def simulate_portfolio(
         eligibility = returns.pivot(
             index="Date", columns="Ticker", values="eligible"
         ).reindex(index=weight_matrix.index, columns=weight_matrix.columns)
-        eligibility = eligibility.fillna(False).astype(bool)
+        # A missing row is a data gap, not evidence that a holding left the
+        # investable universe. Preserve NA so it cannot become a free exit.
+        eligibility = eligibility.astype("boolean")
     else:
         eligibility = pd.DataFrame(True, index=weight_matrix.index, columns=weight_matrix.columns)
 
@@ -109,7 +116,17 @@ def simulate_portfolio(
     rows: list[dict[str, object]] = []
     for date in weight_matrix.index:
         target = weight_matrix.loc[date]
-        ineligible_position = current.ne(0) & ~eligibility.loc[date]
+        active_unknown_eligibility = current.ne(0) & eligibility.loc[date].isna()
+        if active_unknown_eligibility.any():
+            tickers = ", ".join(
+                active_unknown_eligibility[active_unknown_eligibility].index[:5]
+            )
+            raise ValueError(
+                "Missing eligibility for active positions; refusing to infer a "
+                f"forced exit. Examples: {tickers}@{pd.Timestamp(date).date()}"
+            )
+        explicitly_ineligible = eligibility.loc[date].fillna(False).eq(False)
+        ineligible_position = current.ne(0) & explicitly_ineligible
         forced_exit_turnover = float(current.loc[ineligible_position].abs().sum())
         current.loc[ineligible_position] = 0.0
         if bool(rebalance_flags.loc[date]):
@@ -118,6 +135,7 @@ def simulate_portfolio(
         else:
             scheduled_turnover = 0.0
         turnover = forced_exit_turnover + scheduled_turnover
+        transaction_cost = turnover * cost_bps / 10_000
 
         daily_returns = return_matrix.loc[date]
         active_missing = current.ne(0) & daily_returns.isna()
@@ -129,7 +147,8 @@ def simulate_portfolio(
             )
         filled_returns = daily_returns.fillna(0.0)
         gross_return = float(current.mul(filled_returns).sum())
-        denominator = 1.0 + gross_return
+        net_return = gross_return - transaction_cost
+        denominator = 1.0 + net_return
         if denominator <= 0:
             raise ValueError("Portfolio wealth became non-positive")
         current = current.mul(1.0 + filled_returns).div(denominator)
@@ -138,6 +157,8 @@ def simulate_portfolio(
                 "Date": date,
                 "gross_return": gross_return,
                 "turnover": turnover,
+                "transaction_cost": transaction_cost,
+                "net_return": net_return,
                 "scheduled_turnover": scheduled_turnover,
                 "forced_exit_turnover": forced_exit_turnover,
                 "gross_exposure_end": float(current.abs().sum()),

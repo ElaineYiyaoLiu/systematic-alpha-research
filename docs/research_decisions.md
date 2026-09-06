@@ -48,7 +48,9 @@ unrealized label available too soon.
 
 Weights drift with returns between target dates. Turnover is measured from
 pre-trade weights, not prior targets. Loss of eligibility prevents new selection
-but does not erase prices needed to value and close an existing holding.
+but does not erase prices needed to value and close an existing holding. Missing
+eligibility is treated as a data error rather than evidence of an exit. Transaction
+costs reduce portfolio wealth before the next set of drifted weights is calculated.
 
 ## Use dependence-aware inference
 

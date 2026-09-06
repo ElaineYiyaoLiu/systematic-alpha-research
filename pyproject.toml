@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "systematic-alpha-research"
-version = "0.6.1"
+version = "0.6.2"
 description = "Leakage-aware cross-sectional equity research pipeline"
 requires-python = ">=3.11"
 dependencies = [

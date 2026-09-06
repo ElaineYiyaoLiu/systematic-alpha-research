@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.2
+
+- Reject missing eligibility states for active holdings instead of treating a
+  missing security-date row as a free forced exit.
+- Include transaction costs in the wealth used for portfolio-weight drift and
+  rerun each cost-sensitivity scenario with internally consistent weights.
+- Use order-independent average ranks when signals contain ties.
+- Record point-in-time universe metadata whenever a membership file is supplied.
+- Clarify the survivorship-biased, archived nature of the committed case study and
+  replace the legacy `Untouched Test` label with `Historical evaluation`.
+- Add regression tests for missing eligibility, cost-aware drift and tied signals.
+
 ## 0.6.1
 
 - Separate ex-ante portfolio-selection eligibility from label-complete statistical

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "systematic-alpha-research"
+version = "0.6.1"
+description = "Leakage-aware cross-sectional equity research pipeline"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0,<3",
+  "pandas>=2.2,<4",
+  "scipy>=1.13,<2",
+  "matplotlib>=3.8,<4",
+  "PyYAML>=6.0,<7",
+  "yfinance>=0.2.40,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[project.scripts]
+systematic-alpha = "systematic_alpha.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["systematic_alpha*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"

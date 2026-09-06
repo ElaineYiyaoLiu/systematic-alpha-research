@@ -1,0 +1,42 @@
+data:
+  provider: yfinance
+  universe: sp500_current
+  universe_mode: current_constituents
+  membership_path: null
+  start_date: "2015-01-01"
+  end_date: "2025-07-01"
+
+research:
+  minimum_cross_section_size: 100
+  frequency_selection_signal: baseline_equal
+  train: {start: "2015-01-01", end: "2018-12-31"}
+  validation: {start: "2019-01-01", end: "2021-12-31"}
+  test: {start: "2022-01-01", end: "2025-07-01"}
+
+signals:
+  enabled: [reversal, alpha012_robust, alpha101, alpha52_robust]
+  winsor_lower: 0.01
+  winsor_upper: 0.99
+  rolling_window: 252
+  alpha52_robust:
+    low_window: 5
+    low_delay: 5
+    momentum_recent_skip: 20
+    momentum_lookback: 240
+    volume_rank_window: 5
+
+portfolio:
+  quantiles: 5
+  long_exposure: 0.5
+  short_exposure: -0.5
+  rebalance_frequencies: [1, 5, 10, 21]
+  transaction_cost_bps: 5
+  cost_scenarios_bps: [0, 2, 5, 10, 20]
+
+statistics:
+  ic_method: spearman
+  hac_lags: 5
+  annualization_factor: 252
+  bootstrap_simulations: 500
+  bootstrap_block_length: 21
+  bootstrap_seed: 42

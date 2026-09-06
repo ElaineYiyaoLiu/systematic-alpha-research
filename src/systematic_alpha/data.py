@@ -118,6 +118,10 @@ def adjust_ohlcv(data: pd.DataFrame) -> pd.DataFrame:
             stacklevel=2,
         )
         result["volume_adj"] = result["Volume"] / factor
+    # Some vendors report zero volume for unavailable or non-trading
+    # observations. Treat those values as missing so they cannot create a
+    # mechanical price-volume signal or abort an otherwise usable download.
+    result["volume_adj"] = result["volume_adj"].where(result["volume_adj"] > 0)
     columns = [
         "Date",
         "Ticker",
@@ -150,9 +154,11 @@ def validate_processed_data(data: pd.DataFrame) -> dict[str, float | int | str]:
     dates = pd.to_datetime(data["Date"], errors="coerce")
     if dates.isna().any():
         raise ValueError("Date contains invalid values")
-    numeric = ["open_adj", "high_adj", "low_adj", "close_adj", "volume_adj"]
-    if (data[numeric].dropna() <= 0).any().any():
-        raise ValueError("Adjusted prices and volume must be positive")
+    price_columns = ["open_adj", "high_adj", "low_adj", "close_adj"]
+    if (data[price_columns].dropna() <= 0).any().any():
+        raise ValueError("Adjusted prices must be positive")
+    if (data["volume_adj"].dropna() <= 0).any():
+        raise ValueError("Adjusted volume must be positive when available")
     return {
         "rows": len(data),
         "tickers": int(data["Ticker"].nunique()),

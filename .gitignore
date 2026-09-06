@@ -21,10 +21,6 @@ __MACOSX/
 # Generated local run artifacts
 results/reproduced/
 
-# The curated case-study snapshot is intentionally tracked separately.
-!results/case_study/
-!results/case_study/**
-
 # Build and test artifacts
 .pytest_cache/
 .ruff_cache/

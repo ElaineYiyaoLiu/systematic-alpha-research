@@ -92,3 +92,38 @@ def test_processed_data_rejects_nonpositive_values():
     )
     with pytest.raises(ValueError, match="must be positive"):
         validate_processed_data(frame)
+
+
+def test_zero_raw_volume_becomes_missing_and_does_not_abort_validation():
+    raw = pd.DataFrame(
+        {
+            "Date": ["2024-01-01"],
+            "Ticker": ["A"],
+            "Open": [10.0],
+            "High": [11.0],
+            "Low": [9.0],
+            "Close": [10.0],
+            "Adj Close": [10.0],
+            "Volume": [0.0],
+        }
+    )
+    with pytest.warns(UserWarning, match="Stock Splits"):
+        adjusted = adjust_ohlcv(raw)
+    assert adjusted["volume_adj"].isna().all()
+    validate_processed_data(adjusted)
+
+
+def test_processed_data_rejects_negative_available_volume():
+    frame = pd.DataFrame(
+        {
+            "Date": ["2024-01-01"],
+            "Ticker": ["A"],
+            "open_adj": [10.0],
+            "high_adj": [11.0],
+            "low_adj": [9.0],
+            "close_adj": [10.0],
+            "volume_adj": [-1.0],
+        }
+    )
+    with pytest.raises(ValueError, match="volume must be positive"):
+        validate_processed_data(frame)
